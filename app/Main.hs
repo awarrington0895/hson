@@ -35,6 +35,19 @@ instance Alternative Parser where
   empty = Parser $ const Nothing
   (Parser p1) <|> (Parser p2) = Parser $ \input -> p1 input <|> p2 input
 
+notNull :: Parser [a] -> Parser [a]
+notNull (Parser p) = Parser $ \input -> do
+    (input', xs) <- p input
+    if null xs
+      then Nothing
+      else Just (input', xs)
+
+
+spanP :: (Char -> Bool) -> Parser String
+spanP predicate = Parser $ \input -> 
+  let (token, rest) = span predicate input
+  in  Just (rest, token)
+
 jsonNull :: Parser JsonValue
 jsonNull = JsonNull <$ stringP "null"
 
@@ -44,10 +57,11 @@ jsonBool = toBool <$> (stringP "true" <|> stringP "false")
         toBool "false" = JsonBool False
 
 jsonNumber :: Parser JsonValue
-jsonNumber = undefined
+jsonNumber =  toNumber <$> notNull (spanP isDigit)
+  where toNumber digits = JsonNumber $ read digits
 
 jsonValue :: Parser JsonValue
-jsonValue = jsonNull <|> jsonBool
+jsonValue = jsonNull <|> jsonBool <|> jsonNumber
 
 charP :: Char -> Parser Char
 charP x = Parser f
